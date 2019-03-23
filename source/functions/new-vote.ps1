@@ -6,23 +6,21 @@ function new-vote
             Create a new vote
             
         .DESCRIPTION
-            Detailed Description
+            For the current channel, if there are no active votes then
+            Create a new vote for the current channel
+            Set it to active
             
-        .PARAMETER param1
-            What is it, why do you want it
-            
-        ------------
-        .EXAMPLE
-            verb-noun param1
-            
-            #### DESCRIPTION
-            Line by line of what this example will do
-            
-            
-            #### OUTPUT
-            Copy of the output of this line
-            
-            
+        .PARAMETER title
+            What are we voting on
+
+        .PARAMETER options
+            Need at least two
+            What are the voting options
+        
+        .PARAMETER closeAfter
+            After this many votes, close it automatically
+
+            0 means manual close
             
         .NOTES
             Author: Adrian Andersson
@@ -63,8 +61,9 @@ function new-vote
     process{
         write-verbose 'Check the channel and the votedata exists'
 
-        $channelId = $global:PoshBotContext.OriginalMessage.channel
-        if(!$channelId)
+
+        $channel = $global:PoshBotContext.OriginalMessage.RawMessage.channel
+        if(!$channel)
         {
             new-poshbotCardResponse -type Error -text 'Invalid channel response'
             return
@@ -85,7 +84,7 @@ function new-vote
                 write-verbose 'Channel data exists but is not a hashtable, recreating it'
                 $votedata."$channel" = @{}
             }else{
-                $keys = $voteData."$channel".getEnumerator()
+                $keys = $voteData."$channel".keys
                 foreach($key in $keys)
                 {
                     if($votedata."$channel"."$key".isActive -eq $true)
@@ -102,21 +101,55 @@ function new-vote
 
         }
 
+
+        $optionCount = $($options|measure-object).Count
+        if($optionCount -le 1)
+        {
+            new-poshbotCardResponse -type Error -text "Not enough options" -Title 'Options'
+            return
+        }elseIf($optionCount -gt 9)
+        {
+            new-poshbotCardResponse -type Error -text "Too many options - currently limited to 9" -Title 'Options'
+            return
+        }
+
+        $voteId = $voteData."$channel".count
         $voteDetails = @{
+            id = $voteId
+            channel = $channel
             title = $title
             closeAfter = $closeAfter
             isActive = $true
             votes = @{}
             options = [array]$options
+            createdDate = get-date
+            closedDate = $null
         }
         write-verbose 'Getting voteId'
-        $voteId = $voteData."$channel".count
+        
         write-verbose "Got Id of $voteId - Adding data"
         $voteData."$channel"."$voteId" = $voteDetails
 
 
+
         write-verbose 'Saving data'
         save-voteData $voteData
+
+        $i = 0
+        $optionRes = while($i -lt $optionCount)
+        {
+            [psCustomObject] @{
+                id = $i+1
+                option = $options[$i]
+            }
+
+            $i++
+            
+        }
+
+        new-poshbotCardResponse -type normal -text $($optionRes|format-table|out-string) -Title "$title `nUse `!vote #id` to vote"
+
+        
     }
     
 }

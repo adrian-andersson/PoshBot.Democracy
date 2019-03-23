@@ -3,13 +3,16 @@ function Save-vote
 
     <#
         .SYNOPSIS
-            Save a users vote
+            Allow user to select a vote and save it
             
         .DESCRIPTION
-           Save a users vote
+            Allow user to select a vote and save it
+            Will select the current active vote for the channel
+            Will also get results if we go over the count
+
             
-        .PARAMETER param1
-            What is it, why do you want it
+        .PARAMETER option
+            What option they currently selected
             
         ------------
         .EXAMPLE
@@ -43,6 +46,7 @@ function Save-vote
 
     PARAM(
         [Parameter(Mandatory=$true,Position=0)]
+        [ValidateRange(1,9)]
         [int]$option
     )
     begin{
@@ -51,19 +55,16 @@ function Save-vote
         #Return the sent variables when running debug
         Write-Debug "BoundParams: $($MyInvocation.BoundParameters|Out-String)"
         #$user = $global:PoshBotContext.CallingUserInfo.FirstName
-
-        $voteData = get-voteData
-        
     }
     
     process{
         write-verbose 'Check the channel/user and the votedata exists'
 
-        $channelId = $global:PoshBotContext.OriginalMessage.channel
+        $channel = $global:PoshBotContext.OriginalMessage.RawMessage.channel
         $userId = $global:PoshBotContext.FromName
 
 
-        if(!$channelId)
+        if(!$channel)
         {
             new-poshbotCardResponse -type Error -text 'Invalid channel response'
             return
@@ -75,93 +76,65 @@ function Save-vote
             return
         }
 
-        if(!$voteData)
-        {
-            new-poshbotCardResponse -type Error -text 'Unable to load vote data'
-            return
-        }
+        $activeVote = get-activeVote $channel
 
-        write-verbose 'Check we dont have active data already for this channel'
-        if($votedata."$channel")
+        if($activeVote)
         {
-            write-verbose 'Channel data found, checking for validity and active vote'
-            if($votedata."$channel".getType().Name -ne 'Hashtable')
+            $optionAdjust  = $option-1
+            $optionSelect = $activeVote.options[$optionAdjust]
+            if($optionSelect)
             {
-                new-poshbotCardResponse -type Warning -text 'This channel has no votes' -Title 'No votes available'
-                return
-            }else{
-                $keys = $voteData."$channel".getEnumerator()
-                foreach($key in $keys)
+                write-verbose 'Checking if user has already voted'
+                if($activeVote.votes."$userId")
                 {
-                    if($votedata."$channel"."$key".isActive -eq $true)
-                    {
-                        $activeVote = $votedata."$channel"."$key"
-                        $voteId = $key
-                    }
+                    #'1'
+                    write-verbose 'Active vote for user in play'
+                    
+                    $response = "$($global:PoshBotContext.CallingUserInfo.FirstName) changed their vote to $optionSelect"
+                    
+
+                }else{
+                    #'2'
+                    write-verbose 'New vote for user'
+
+                    $response = "$($global:PoshBotContext.CallingUserInfo.FirstName) voted for $optionSelect"
                     
                 }
-            }
+                $activeVote.votes."$userId" = $optionAdjust
+                new-poshbotTextResponse -text $response
 
-        }else{
-            new-poshbotCardResponse -type Warning -text 'This channel has no votes' -Title 'No votes available'
-            return
-        }
+                #Check whether we should close voting
+                $close = get-voteCloseStatus $activeVote
+                #$close
+                if($close -eq 'shouldClose')
+                {
+                    write-verbose 'We should close the vote'
+                    new-poshbotTextResponse -text '_That was the last required vote, closing and getting results_'
+                    $activeVote.isActive = $false
+                    #get the results
+                    $results = get-voteresult $activeVote
+                    if($results)
+                    {
+                        new-poshbotCardResponse -type normal -text $results -Title "Results | $($activeVote.title)"
+                    }
+                }
 
-        if(!$activeVote)
-        {
-            new-poshbotCardResponse -type Warning -text 'This channel has no active votes' -Title 'No active votes'
-            return
-        }
-        if($activeVote.isActive -ne $true)
-        {
-            new-poshbotTextResponse -DM -Text 'It seems voting is already closed'
-            return
-        }
-
-        write-verbose 'Check the vote was valid'
-        $optionRed = $option -1
-        $optionSelect = $activeVote.options[$optionRed]
-        if($optionSelect)
-        {
-            write-verbose 'Vote looks ok'
-        }else{
-            new-poshbotTextResponse -DM -Text "Option $option is invalid"
-            return
-        }
-
-
-        write-verbose 'Checking if user has already voted'
-        {
-            if($activeVote.votes."$userId")
-            {
-                write-verbose 'Active vote for user in play'
-                
-                $activeVote.votes."$userId" = $option
-                new-poshbotTextResponse -DM -Text "Vote changed to $($option): $($activeVote.options[$optionRed])"
+                if($(save-activeVote $activeVote) -eq $true){
+                    write-verbose 'succesful save'
+                    return
+                }else{
+                    write-verbose 'error save'
+                    new-poshbotCardResponse -type Warning -text 'Error saving vote' -Title 'Error Saving Vote'
+                }
 
             }else{
-                $activeVote.votes."$userId" = $option
-                new-poshbotTextResponse -DM -Text "Initial vote set to $($option): $($activeVote.options[$optionRed])`n`nCast again to change"
+                new-poshbotTextResponse -DM -Text "Option $option is invalid"
+                return
             }
+        }else{
+            new-poshbotCardResponse -type Warning -text 'This channel has no active votes (debug: ac)' -Title 'No active votes'
+            return
         }
-        
-
-        #Check whether we should close voting
-        $close = get-voteCloseStatus $activeVote
-        if($close -eq 'shouldClose')
-        {
-            write-verbose 'We should close the vote'
-            $activeVote.isActive = $false
-            #get the results
-            get-voteresults $activeVote
-        }
-
-
-
-        write-verbose 'Saving data'
-        save-voteData $voteData
-
-
     }
     
 }

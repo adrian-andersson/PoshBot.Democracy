@@ -3,39 +3,26 @@ function get-voteCloseStatus
 
     <#
         .SYNOPSIS
-            Simple description
+            Figure out what the close state should be
+            I.E. if the closeAfter is set, should we close it
             
         .DESCRIPTION
-            Detailed Description
+            Figure out what the close state should be
+            I.E. if the closeAfter is set, should we close it
+
+        .PARAMETER ActiveVote
+            An active vote hashtable
             
-        .PARAMETER param1
-            What is it, why do you want it
-            
-        ------------
-        .EXAMPLE
-            verb-noun param1
-            
-            #### DESCRIPTION
-            Line by line of what this example will do
-            
-            
-            #### OUTPUT
-            Copy of the output of this line
-            
-            
-            
+        
         .NOTES
             Author: Adrian Andersson
-            Last-Edit-Date: yyyy-mm-dd
             
             
             Changelog:
-                yyyy-mm-dd - AA
+
+                2019-03-22 - AA
+                    - Initial Script
                     
-                    - Changed x for y
-                    
-        .COMPONENT
-            What cmdlet does this script live in
     #>
 
     [CmdletBinding()]
@@ -61,10 +48,12 @@ function get-voteCloseStatus
             {
                 write-verbose 'check the number of votes'
                 $count = $activeVote.votes.count
-                if($count -ge $activeVote.closeAfter)
+                if($count -ge $activeVote.closeAfter -and $activeVote.closeAfter -ne 0)
                 {
                     #we should close
                     return 'shouldClose'
+                }elseIf($activeVote.closeAfter -eq 0){
+                    return 'manualClose'
                 }else{
                     return 'active'
                 }

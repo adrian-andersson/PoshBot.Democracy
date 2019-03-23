@@ -6,7 +6,7 @@ function save-voteData
             Save the vote data
             
         .DESCRIPTION
-            Save the vote data
+            Helper function to save all the votedata to file
 
         .PARAMETER voteData
             Hashtable of the voteData
@@ -44,7 +44,7 @@ function save-voteData
     
     process{
         $folder = split-path $Path -Parent
-        $file = split-path $Path -Leaf
+        
         
         write-verbose 'Checking for directory'
         if(!$(test-path $folder))

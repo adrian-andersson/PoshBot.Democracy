@@ -6,23 +6,14 @@ function get-voteData
             Get the vote data
             
         .DESCRIPTION
-            Get the vote data
+            Get all the vote data from the vote file
+
+            If there is none, pass back an empty hashtable
             
         .PARAMETER path
             Path to the xml file
 
-        .EXAMPLE
-            verb-noun param1
-            
-            #### DESCRIPTION
-            Line by line of what this example will do
-            
-            
-            #### OUTPUT
-            Copy of the output of this line
-            
-            
-            
+
         .NOTES
             Author: Adrian Andersson
             

@@ -1,41 +1,28 @@
-function get-voteCloseStatus
+function get-voteResult
 {
 
     <#
         .SYNOPSIS
-            Simple description
+            Get a preformated response for the active Vote
             
         .DESCRIPTION
-            Detailed Description
+            Get a preformated response for the active Vote
+
+            Return a nice vote tally
+            As well as a line-by-line of who chose what
             
-        .PARAMETER param1
-            What is it, why do you want it
-            
-        ------------
-        .EXAMPLE
-            verb-noun param1
-            
-            #### DESCRIPTION
-            Line by line of what this example will do
-            
-            
-            #### OUTPUT
-            Copy of the output of this line
-            
-            
+        .PARAMETER activeVote
+            An active vote hashtable
             
         .NOTES
             Author: Adrian Andersson
-            Last-Edit-Date: yyyy-mm-dd
             
             
             Changelog:
-                yyyy-mm-dd - AA
+
+                2019-03-22 - AA
+                    - Initial Script
                     
-                    - Changed x for y
-                    
-        .COMPONENT
-            What cmdlet does this script live in
     #>
 
     [CmdletBinding()]
@@ -55,30 +42,44 @@ function get-voteCloseStatus
         write-verbose 'Check we have valid voteData'
         
 
+        
         if($activeVote)
         {
-            $results = $activeVote.votes.values |group-object|select-object Count,Name
-            $totalVotes = $($results.count|measure-object -Sum).sum
-            if($totalVotes -le 0)
-            {
-                return $null
-            }
+            $groupedResults = $activeVote.votes.values |group-object|select-object Count,Name
+            $totalVotes = $($groupedResults.count|measure-object -Sum).sum
             $i = 0
-            $optionCount = $($activeVote.options|measure-object).Count
-            $result = while($i -le $optionCount)
+            $totalOptions = $($activeVote.options|measure-object).count
+            $voteSummary = while($i -lt $totalOptions)
             {
                 $option = $activeVote.options[$i]
-                $resultItem = $result|where-object {$_.name -eq $option}
-                [psCustomObject]@{
-                    optionNo = $i
-                    option = $option
-                    votes = $resultItem.count
-                    percent = $([math]::round($($resultItem.count/$totalVotes)*100,0))
-
+                $votes = $($groupedResults|where-object{$_.name -eq $i}).count
+                if(!$votes)
+                {
+                    $votes = 0
                 }
+                $voters = $activeVote.votes
+                [psCustomObject] @{
+                    Option = $option
+                    Votes = $votes
+                    Percent =  $([math]::round($($votes/$totalVotes)*100,0))
+                    voters = $($activevote.votes.GetEnumerator()|where-object{$_.value -eq $i}).name
+                }
+
+                $i++
             }
 
+            $top = "$($voteSummary | select-object Option,Votes,Percent|format-table|out-string)"
+
+            $bottom = foreach($v in $voteSummary)
+            {
+                "*$($v.option)*`n--------------------------`n    $($v.voters -join "`n    ")`n`n`n"
+            }
+
+            $result = "$top`n$bottom"
+
             return $result
+
+            
         }else{
             return $null
         }
